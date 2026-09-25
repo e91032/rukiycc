@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#e7ddcb">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111917">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>拉密 · 單人挑戰</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+
+  --room:#e7ddcb;
+  --panel:#d5c8ae;
+  --felt:#2b5b4e;
+  --felt-edge:#20463c;
+  --ink:#2a2419;
+  --ink-soft:#6c6150;
+  --on-felt:#eae2cf;
+  --on-felt-soft:#9fb6ac;
+  --line:rgba(40,30,15,.16);
+  --brass:#c2922f;
+  --alert:#b8462f;
+  --ok:#1f7a5a;
+  --btn:#fbf5e7;
+  --btn-ink:#2a2419;
+  --shadow:0 2px 4px rgba(20,14,4,.28);
+
+  --tile-face:linear-gradient(177deg,#fffbf0 0%,#f7eeda 46%,#e9dcc0 100%);
+  --tw:clamp(38px,9.4vw,54px);
+}
+*,*::before,*::after{box-sizing:inherit}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --room:#111917;
+    --panel:#1a2622;
+    --felt:#1c443a;
+    --felt-edge:#12302a;
+    --ink:#ece3d2;
+    --ink-soft:#9aa9a1;
+    --line:rgba(255,255,255,.12);
+    --btn:#26332e;
+    --btn-ink:#ece3d2;
+    --ok:#5fd0a6;
+    --shadow:0 2px 5px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --room:#111917; --panel:#1a2622; --felt:#1c443a; --felt-edge:#12302a;
+  --ink:#ece3d2; --ink-soft:#9aa9a1; --line:rgba(255,255,255,.12);
+  --btn:#26332e; --btn-ink:#ece3d2; --ok:#5fd0a6; --shadow:0 2px 5px rgba(0,0,0,.5);
+}
+
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--room);
+  color:var(--ink);
+  font-family:"Noto Sans TC","Archivo",system-ui,-apple-system,"PingFang TC","Microsoft JhengHei",sans-serif;
+  font-size:15px;
+  line-height:1.5;
+  -webkit-text-size-adjust:100%;
+  overscroll-behavior:none;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+
+.app{height:100%;display:flex;flex-direction:column;max-width:1040px;margin:0 auto}
+
+/* ── header ─────────────────────────────── */
+header{
+  display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+  padding:10px 14px 8px;
+}
+.wordmark{
+  font-family:"Archivo",sans-serif;font-weight:800;font-size:22px;letter-spacing:-.01em;
+  display:flex;align-items:baseline;gap:8px;
+}
+.wordmark em{
+  font-style:normal;font-family:"Noto Sans TC",sans-serif;font-weight:700;
+}
+.wordmark span{font-size:12px;font-weight:500;color:var(--ink-soft);letter-spacing:.02em}
+.stats{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.chip{
+  display:flex;align-items:baseline;gap:5px;
+  padding:3px 9px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--line);
+  font-size:11px;color:var(--ink-soft);white-space:nowrap;
+}
+.chip b{font-family:"Archivo",sans-serif;font-size:14px;font-weight:700;color:var(--ink)}
+.chip.locked{background:var(--alert);border-color:transparent;color:#fff2ea}
+.chip.locked b{color:#fff}
+.chip.open{background:var(--brass);border-color:transparent;color:#2a1f05}
+.chip.open b{color:#1d1503}
+
+/* ── board ──────────────────────────────── */
+.board{
+  flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  margin:0 10px;padding:12px;
+  background:
+    radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.06),transparent 60%),
+    var(--felt);
+  border:1px solid var(--felt-edge);
+  border-radius:12px;
+  box-shadow:inset 0 2px 14px rgba(0,0,0,.32);
+  display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start;
+}
+.empty-board{
+  margin:auto;text-align:center;color:var(--on-felt-soft);font-size:13px;max-width:26ch;line-height:1.7
+}
+
+.set{
+  display:flex;flex-direction:column;gap:5px;
+  padding:7px 8px 8px;
+  background:rgba(0,0,0,.2);
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:10px;
+}
+.set.bad{border-color:var(--alert);background:rgba(184,70,47,.22)}
+.set-head{
+  display:flex;align-items:center;gap:8px;
+  font-size:10.5px;color:var(--on-felt-soft);line-height:1;
+}
+.set.bad .set-head{color:#ffc3b3}
+.set-head .val{font-family:"Archivo",sans-serif;font-weight:700;color:var(--on-felt)}
+.set-head button{
+  margin-left:auto;font-size:10.5px;color:var(--on-felt);
+  border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:2px 8px;line-height:1.3;
+}
+.set-head button:hover{background:rgba(255,255,255,.14)}
+.set-tiles{display:flex;gap:3px}
+
+.new-slot{
+  display:flex;align-items:center;justify-content:center;
+  min-width:96px;padding:0 16px;
+  min-height:calc(var(--tw) * 1.36 + 30px);
+  border:1.5px dashed rgba(255,255,255,.28);border-radius:10px;
+  color:var(--on-felt-soft);font-size:12px;text-align:center;line-height:1.4;
+}
+.new-slot:hover,.new-slot.hot{border-color:var(--brass);color:var(--brass)}
+
+/* ── tiles ──────────────────────────────── */
+.tile{
+  position:relative;
+  width:var(--tw);height:calc(var(--tw) * 1.36);
+  padding:0;flex:none;
+  background:var(--tile-face);
+  border-radius:7px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.9),
+    inset 0 -3px 0 rgba(90,68,30,.18),
+    var(--shadow);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:var(--tc,#2f2f2f);
+  transition:transform .12s ease,box-shadow .12s ease;
+}
+.tile[data-color="red"]{--tc:#bd3527}
+.tile[data-color="blue"]{--tc:#1d5c9e}
+.tile[data-color="black"]{--tc:#33322f}
+.tile[data-color="orange"]{--tc:#cf7a15}
+.tile[data-color="joker"]{--tc:#6f3d8f}
+.tile .n{
+  font-family:"Archivo",sans-serif;font-weight:700;
+  font-size:calc(var(--tw) * .56);line-height:1;letter-spacing:-.03em;
+}
+.tile .dot{
+  width:23%;aspect-ratio:1;border:1.6px solid currentColor;border-radius:50%;
+  margin-top:7%;opacity:.5;
+}
+.tile svg{width:56%;height:auto}
+.tile .jmark{
+  position:absolute;top:3px;right:4px;
+  font-family:"Archivo",sans-serif;font-size:9px;font-weight:700;
+  color:#6f3d8f;opacity:.85;
+}
+.tile.joker{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 0 0 1.5px rgba(111,61,143,.35),inset 0 -3px 0 rgba(90,68,30,.18),var(--shadow)}
+.tile.sel{transform:translateY(-9px);box-shadow:0 0 0 2.5px var(--brass),0 8px 12px rgba(0,0,0,.35)}
+.tile.fresh::before{
+  content:"";position:absolute;inset:auto 0 3px 0;margin:0 auto;
+  width:38%;height:2px;border-radius:2px;background:var(--brass);
+}
+.tile:disabled{cursor:default}
+
+/* ── rack ───────────────────────────────── */
+.rack-wrap{padding:10px 10px 0}
+.rack-bar{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;padding:0 2px;
+}
+.rack-bar .note{color:var(--brass);font-weight:500}
+.sorts{margin-left:auto;display:flex;gap:4px}
+.sorts button{
+  font-size:11px;padding:3px 9px;border-radius:999px;
+  border:1px solid var(--line);background:var(--btn);color:var(--btn-ink);
+}
+.sorts button:hover{border-color:var(--brass)}
+.sorts button.back{border-color:var(--brass);color:var(--brass);font-weight:500}
+.sorts button.back:hover{background:var(--brass);color:#241a04}
+.rack{
+  display:flex;flex-wrap:wrap;gap:4px;
+  padding:10px 9px 12px;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-top:3px solid rgba(0,0,0,.16);
+  border-radius:8px;
+  box-shadow:inset 0 6px 10px -8px rgba(0,0,0,.4);
+  min-height:calc(var(--tw) * 1.36 + 22px);
+}
+
+/* ── actions ────────────────────────────── */
+.actions{
+  display:flex;gap:6px;padding:10px;
+  overflow-x:auto;scrollbar-width:none;
+}
+.actions::-webkit-scrollbar{display:none}
+.actions button{
+  flex:none;padding:9px 14px;border-radius:8px;
+  background:var(--btn);color:var(--btn-ink);
+  border:1px solid var(--line);
+  font-size:13px;font-weight:500;white-space:nowrap;
+  box-shadow:0 1px 0 var(--line);
+}
+.actions button:hover{border-color:var(--brass)}
+.actions button.key{background:var(--felt);color:var(--on-felt);border-color:var(--felt-edge)}
+.actions button.key:hover{background:var(--felt-edge)}
+.actions button.gold{background:var(--brass);color:#241a04;border-color:transparent;font-weight:700}
+.actions button.gold:hover{filter:brightness(1.07)}
+
+.msg{
+  min-height:20px;padding:0 14px;font-size:12.5px;color:var(--ink-soft);
+}
+.msg.warn{color:var(--alert);font-weight:500}
+.msg.good{color:var(--ok);font-weight:500}
+
+/* ── overlay ────────────────────────────── */
+.veil{
+  position:fixed;inset:0;z-index:20;
+  background:rgba(12,20,17,.7);backdrop-filter:blur(3px);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.veil[hidden]{display:none}
+.sheet{
+  background:var(--room);color:var(--ink);
+  border:1px solid var(--line);border-radius:14px;
+  padding:22px;max-width:440px;width:100%;
+  max-height:80vh;overflow-y:auto;
+  box-shadow:0 18px 40px rgba(0,0,0,.45);
+}
+.sheet h2{
+  margin:0 0 4px;font-size:19px;font-weight:700;
+}
+.sheet .lede{margin:0 0 14px;color:var(--ink-soft);font-size:13px}
+.sheet ul{margin:0 0 16px;padding-left:1.15em}
+.sheet li{margin-bottom:7px;font-size:13.5px;line-height:1.6}
+.sheet li b{font-weight:700}
+.sheet .close{
+  display:block;width:100%;padding:11px;border-radius:9px;
+  background:var(--felt);color:var(--on-felt);font-weight:600;
+}
+.result{font-family:"Archivo",sans-serif;font-weight:800;font-size:34px;line-height:1.1;margin:0 0 6px}
+.score-row{display:flex;gap:18px;margin:14px 0 18px}
+.score-row div{font-size:12px;color:var(--ink-soft)}
+.score-row b{display:block;font-family:"Archivo",sans-serif;font-size:24px;font-weight:700;color:var(--ink)}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+@media (min-width:700px){
+  body{font-size:15.5px}
+  .board{margin:0 14px;padding:16px;gap:12px}
+  .rack-wrap{padding:12px 14px 0}
+  .actions{padding:12px 14px}
+}
+
+/* ── 手機：觸控尺寸、操作列、動態工具列 ───────── */
+@supports (height:100dvh){ html,body{height:100dvh} }
+button{touch-action:manipulation}
+.tile{-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.set{max-width:100%}
+.set-tiles{overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.set-tiles::-webkit-scrollbar{display:none}
+
+.actions{display:block;overflow:visible;padding:8px 10px}
+.actions .row{display:flex;gap:6px}
+.actions .row + .row{margin-top:6px}
+.actions .row button{flex:1 1 0;min-width:0;padding:11px 8px;font-size:13.5px}
+.actions .row.minor button{padding:8px 6px;font-size:12.5px;font-weight:400}
+.short{display:none}
+
+@media (max-width:560px){
+  :root{--tw:clamp(40px,12vw,52px)}
+  .full{display:none}
+  .short{display:inline}
+  header{padding:8px 11px 5px}
+  .wordmark{font-size:17px}
+  .wordmark span{font-size:10.5px}
+  .seat{padding:2px 8px;font-size:11px}
+  .board{margin:0 8px;padding:10px;gap:8px}
+  .rack-wrap{padding:8px 8px 0}
+  .rack{padding:9px 7px 11px}
+  .msg{padding:0 11px;font-size:12px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="wordmark"><em>拉密</em><span>單人挑戰</span></div>
+    <div class="stats">
+      <div class="chip"><b id="statTurn">1</b>回合</div>
+      <div class="chip"><b id="statRack">14</b>手牌</div>
+      <div class="chip"><b id="statPool">92</b>牌堆</div>
+      <div class="chip locked" id="meldChip"><b>破冰</b>還差 30 分</div>
+    </div>
+  </header>
+
+  <div class="board" id="board"></div>
+
+  <div class="rack-wrap">
+    <div class="rack-bar">
+      <span>你的手牌</span>
+      <span class="note" id="selNote"></span>
+      <div class="sorts">
+        <button data-sort="num">依數字排</button>
+        <button data-sort="color">依顏色排</button>
+      </div>
+    </div>
+    <div class="rack" id="rack"></div>
+  </div>
+
+  <p class="msg" id="msg">選幾張牌，再按「排成新組合」。</p>
+
+  <nav class="actions">
+    <div class="row">
+      <button class="gold" id="btnNew">排成新組合</button>
+      <button class="key" id="btnEnd">結束回合</button>
+      <button id="btnDraw">抽一張牌</button>
+    </div>
+    <div class="row minor">
+      <button id="btnBack"><span class="full">收回手上</span><span class="short">收回</span></button>
+      <button id="btnReset"><span class="full">還原這回合</span><span class="short">還原</span></button>
+      <button id="btnHint"><span class="full">給點提示</span><span class="short">提示</span></button>
+      <button id="btnRules">玩法</button>
+      <button id="btnRestart"><span class="full">新遊戲</span><span class="short">新局</span></button>
+    </div>
+  </nav>
+</div>
+
+<div class="veil" id="rulesVeil" hidden>
+  <div class="sheet">
+    <h2>拉密怎麼玩</h2>
+    <p class="lede">106 張牌：紅、藍、黑、橘各 1–13 兩套，再加 2 張鬼牌。把手上 14 張牌全部打完就贏了。</p>
+    <ul>
+      <li><b>有效組合有兩種。</b>順子是同顏色的連號 3 張以上；同數組是同一個數字、不同顏色的 3 或 4 張。</li>
+      <li><b>第一次下牌要滿 30 分。</b>這一手只能用自己的牌組出新組合，不能碰桌面，合計點數要達到 30。</li>
+      <li><b>破冰之後桌面就開放了。</b>你可以把桌上的牌拆開重組、借來接龍，只要回合結束時每一組都成立，而且至少放下了 1 張手牌。</li>
+      <li><b>鬼牌代替任何一張牌。</b>它會自動算成對你最有利的數字。</li>
+      <li><b>一個回合只能二選一：出牌或抽牌。</b>抽牌代表這回合放棄出牌，桌面會回到回合開始的樣子，剛放上去的牌收回手上。排好了要留著，按的是「結束回合」。</li>
+      <li><b>牌堆抽完還沒打完手牌</b>，這局就結束了。</li>
+      <li><b>操作方式：</b>點牌選取，再點某一組的「加入這組」，或按「排成新組合」。這回合剛放上桌的牌（底下有金線）隨時能按「收回手上」拿回來，回合一結束就收不回了。</li>
+    </ul>
+    <button class="close" data-close>開始吧</button>
+  </div>
+</div>
+
+<div class="veil" id="endVeil" hidden>
+  <div class="sheet">
+    <p class="result" id="endTitle"></p>
+    <p class="lede" id="endText"></p>
+    <div class="score-row">
+      <div>回合<b id="endTurns">0</b></div>
+      <div>剩餘手牌<b id="endLeft">0</b></div>
+      <div>最佳紀錄<b id="endBest">—</b></div>
+    </div>
+    <button class="close" data-close>再來一局</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+const COLORS = ["red","blue","black","orange"];
+const CN = {red:"紅",blue:"藍",black:"黑",orange:"橘"};
+const JOKER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8.4 14.2c.9 1.3 2.1 2 3.6 2s2.7-.7 3.6-2"/><circle cx="9" cy="9.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="9.6" r="1.1" fill="currentColor" stroke="none"/></svg>';
+const BEST_KEY = "rummikub-solo-best-v1";
+
+let uid = 0;
+const S = {
+  pool:[], rack:[], table:[], melded:false, turn:1, over:false,
+  sel:[], snap:null, snapSetIds:new Set(), snapTileIds:new Set(), nextSetId:1
+};
+
+/* ── deck ──────────────────────────────── */
+function buildDeck(){
+  const d = [];
+  for (const c of COLORS)
+    for (let copy=0; copy<2; copy++)
+      for (let n=1; n<=13; n++)
+        d.push({id:"t"+(uid++), color:c, num:n, joker:false});
+  d.push({id:"t"+(uid++), color:"joker", num:0, joker:true});
+  d.push({id:"t"+(uid++), color:"joker", num:0, joker:true});
+  for (let i=d.length-1; i>0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [d[i],d[j]] = [d[j],d[i]];
+  }
+  return d;
+}
+
+/* ── set validation ────────────────────── */
+function analyze(tiles){
+  const n = tiles.length;
+  if (n === 0) return {valid:false, why:"空的"};
+  if (n < 3)  return {valid:false, why:"還差 " + (3-n) + " 張"};
+  if (n > 13) return {valid:false, why:"太長了"};
+
+  const jokers = tiles.filter(t => t.joker);
+  const real   = tiles.filter(t => !t.joker);
+  if (real.length === 0) return {valid:false, why:"全是鬼牌"};
+
+  let best = null;
+
+  // same-number group
+  if (n <= 4){
+    const num = real[0].num;
+    const cols = new Set(real.map(t => t.color));
+    if (real.every(t => t.num === num) && cols.size === real.length){
+      const ordered = real.slice().sort((a,b) => COLORS.indexOf(a.color) - COLORS.indexOf(b.color));
+      const laid = ordered.map(t => ({tile:t, num:num, color:t.color}))
+        .concat(jokers.map(t => ({tile:t, num:num, color:"joker"})));
+      best = {valid:true, kind:"同數", value:num*n, laid:laid};
+    }
+  }
+
+  // run
+  const col = real[0].color;
+  if (real.every(t => t.color === col)){
+    const nums = real.map(t => t.num).sort((a,b) => a-b);
+    if (new Set(nums).size === nums.length){
+      const lo = nums[0], hi = nums[nums.length-1];
+      const sMin = Math.max(1, hi - n + 1);
+      const sMax = Math.min(lo, 14 - n);
+      if (sMin <= sMax){
+        const start = sMax;                       // 靠高位排，分數最高
+        let value = 0;
+        for (let i=0;i<n;i++) value += start + i;
+        if (!best || value > best.value){
+          const laid = [];
+          let j = 0;
+          for (let v=start; v<start+n; v++){
+            const hit = real.find(t => t.num === v);
+            laid.push(hit ? {tile:hit, num:v, color:col} : {tile:jokers[j++], num:v, color:"joker"});
+          }
+          best = {valid:true, kind:"順子", value:value, laid:laid};
+        }
+      }
+    }
+  }
+
+  return best || {valid:false, why:"不成組合"};
+}
+
+/* ── helpers ───────────────────────────── */
+const clone = o => JSON.parse(JSON.stringify(o));
+const setById = id => S.table.find(s => s.id === id);
+
+function locate(tid){
+  if (S.rack.some(t => t.id === tid)) return {where:"rack"};
+  for (const s of S.table) if (s.tiles.some(t => t.id === tid)) return {where:"table", set:s};
+  return null;
+}
+
+function takeSelected(){
+  const out = [];
+  for (const id of S.sel){
+    const loc = locate(id);
+    if (!loc) continue;
+    if (loc.where === "rack"){
+      const i = S.rack.findIndex(t => t.id === id);
+      out.push(S.rack.splice(i,1)[0]);
+    } else {
+      const i = loc.set.tiles.findIndex(t => t.id === id);
+      out.push(loc.set.tiles.splice(i,1)[0]);
+    }
+  }
+  S.table = S.table.filter(s => s.tiles.length > 0);
+  S.sel = [];
+  return out;
+}
+
+function snapshot(){
+  S.snap = {rack:clone(S.rack), table:clone(S.table), pool:clone(S.pool), melded:S.melded};
+  S.snapSetIds = new Set(S.table.map(s => s.id));
+  S.snapTileIds = new Set();
+  S.table.forEach(s => s.tiles.forEach(t => S.snapTileIds.add(t.id)));
+}
+function revert(){
+  S.rack = clone(S.snap.rack);
+  S.table = clone(S.snap.table);
+  S.pool = clone(S.snap.pool);
+  S.melded = S.snap.melded;
+  S.sel = [];
+}
+
+function say(text, tone){
+  const el = document.getElementById("msg");
+  el.textContent = text;
+  el.className = "msg" + (tone ? " " + tone : "");
+}
+
+/* ── rendering ─────────────────────────── */
+function tileButton(tile, laid, onTable){
+  const b = document.createElement("button");
+  b.className = "tile" + (tile.joker ? " joker" : "");
+  b.dataset.id = tile.id;
+  b.dataset.color = tile.joker ? "joker" : tile.color;
+  if (S.sel.includes(tile.id)) b.classList.add("sel");
+  if (onTable && !S.snapTileIds.has(tile.id)) b.classList.add("fresh");
+
+  if (tile.joker && !laid){
+    b.innerHTML = JOKER_SVG;
+    b.setAttribute("aria-label","鬼牌");
+  } else {
+    const v = tile.joker ? laid.num : tile.num;
+    b.innerHTML = '<span class="n">'+v+'</span><span class="dot"></span>' + (tile.joker ? '<span class="jmark">J</span>' : "");
+    b.setAttribute("aria-label", (tile.joker ? "鬼牌當 " : CN[tile.color]||"") + v);
+  }
+  b.addEventListener("click", () => pick(tile.id));
+  return b;
+}
+
+function render(){
+  const board = document.getElementById("board");
+  board.innerHTML = "";
+
+  if (S.table.length === 0){
+    const p = document.createElement("p");
+    p.className = "empty-board";
+    p.textContent = "桌面還是空的。挑出一組順子或同數組，湊滿 30 分就能開張。";
+    board.appendChild(p);
+  }
+
+  for (const s of S.table){
+    const info = analyze(s.tiles);
+    const card = document.createElement("div");
+    card.className = "set" + (info.valid ? "" : " bad");
+
+    const head = document.createElement("div");
+    head.className = "set-head";
+    head.innerHTML = info.valid
+      ? info.kind + ' <span class="val">' + info.value + ' 分</span>'
+      : info.why;
+    const add = document.createElement("button");
+    add.textContent = "加入這組";
+    add.addEventListener("click", () => place(s.id));
+    head.appendChild(add);
+    card.appendChild(head);
+
+    const row = document.createElement("div");
+    row.className = "set-tiles";
+    const order = info.valid ? info.laid : s.tiles.map(t => ({tile:t, num:t.num, color:t.color}));
+    for (const item of order) row.appendChild(tileButton(item.tile, info.valid ? item : null, true));
+    card.appendChild(row);
+    board.appendChild(card);
+  }
+
+  const slot = document.createElement("button");
+  slot.className = "new-slot";
+  slot.textContent = S.sel.length ? "放成新組合（" + S.sel.length + "）" : "＋ 新組合";
+  if (S.sel.length) slot.classList.add("hot");
+  slot.addEventListener("click", () => place("new"));
+  board.appendChild(slot);
+
+  const rack = document.getElementById("rack");
+  rack.innerHTML = "";
+  for (const t of S.rack) rack.appendChild(tileButton(t, null, false));
+
+  document.getElementById("statTurn").textContent = S.turn;
+  document.getElementById("statRack").textContent = S.rack.length;
+  document.getElementById("statPool").textContent = S.pool.length;
+
+  const chip = document.getElementById("meldChip");
+  if (S.melded){
+    chip.className = "chip open";
+    chip.innerHTML = "<b>已破冰</b>桌面開放";
+  } else {
+    const pending = pendingMeldValue();
+    chip.className = "chip locked";
+    chip.innerHTML = pending > 0
+      ? "<b>" + pending + " / 30</b>破冰"
+      : "<b>破冰</b>還差 30 分";
+  }
+
+  const note = document.getElementById("selNote");
+  note.textContent = S.sel.length ? "已選 " + S.sel.length + " 張" : "";
+}
+
+function pendingMeldValue(){
+  let v = 0;
+  for (const s of S.table){
+    if (S.snapSetIds.has(s.id)) continue;
+    const a = analyze(s.tiles);
+    if (a.valid) v += a.value;
+  }
+  return v;
+}
+
+/* ── interaction ───────────────────────── */
+function pick(tid){
+  if (S.over) return;
+  disarmDraw();
+  const i = S.sel.indexOf(tid);
+  if (i >= 0){ S.sel.splice(i,1); render(); return; }
+
+  const loc = locate(tid);
+  if (!loc) return;
+  if (loc.where === "table" && !S.melded && S.snapSetIds.has(loc.set.id)){
+    say("破冰之前不能動桌上的牌。先用手牌湊出 30 分。", "warn");
+    return;
+  }
+  S.sel.push(tid);
+  render();
+  say(" ");
+}
+
+function place(target){
+  if (S.over) return;
+  disarmDraw();
+  if (S.sel.length === 0){ say("先點幾張牌選起來。", "warn"); return; }
+  if (target !== "new" && !S.melded && S.snapSetIds.has(target)){
+    say("破冰之前不能往桌上的組合加牌，只能自己排新的一組。", "warn");
+    return;
+  }
+  const moving = takeSelected();
+  if (target === "new"){
+    S.table.push({id:"s"+(S.nextSetId++), tiles:moving});
+  } else {
+    const s = setById(target);
+    if (s) s.tiles = s.tiles.concat(moving);
+    else S.table.push({id:"s"+(S.nextSetId++), tiles:moving});
+  }
+  render();
+  say(" ");
+}
+
+function reclaim(){
+  if (S.over) return;
+  disarmDraw();
+  if (S.sel.length === 0){
+    say("先點你這回合放上桌的牌，底下有金色線的那幾張。", "warn");
+    return;
+  }
+  const stuck = S.sel.filter(id => {
+    const loc = locate(id);
+    return loc && loc.where === "table" && S.snapTileIds.has(id);
+  });
+  if (stuck.length){
+    say("只能收回這回合自己放上去的牌。桌面原本就有的牌打出去就回不來了。", "warn");
+    return;
+  }
+  const n = S.sel.length;
+  const moving = takeSelected();
+  S.rack = S.rack.concat(moving);
+  render();
+  say("收回 " + n + " 張。");
+}
+
+function endTurn(){
+  if (S.over) return;
+  disarmDraw();
+  const bad = S.table.filter(s => !analyze(s.tiles).valid);
+
+  if (!S.melded){
+    const fresh = S.table.filter(s => !S.snapSetIds.has(s.id));
+    if (fresh.length === 0){ say("還沒放下任何牌。湊不出來就抽一張。", "warn"); return; }
+    if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); return; }
+    const total = fresh.reduce((a,s) => a + analyze(s.tiles).value, 0);
+    if (total < 30){ say("破冰要一次滿 30 分，現在只有 " + total + " 分。", "warn"); return; }
+    S.melded = true;
+    commit("破冰成功，" + total + " 分。桌面開放了。");
+    return;
+  }
+
+  const played = S.snap.rack.length - S.rack.length;
+  if (played <= 0){ say("這回合得至少放下 1 張手牌。", "warn"); return; }
+  if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); return; }
+  commit("打出 " + played + " 張。");
+}
+
+function commit(note){
+  for (const s of S.table){
+    const a = analyze(s.tiles);
+    if (a.valid) s.tiles = a.laid.map(x => x.tile);
+  }
+  if (S.rack.length === 0){ finish(true); return; }
+  S.turn++;
+  snapshot();
+  render();
+  say(note + "還剩 " + S.rack.length + " 張。", "good");
+}
+
+function turnChanged(){
+  if (S.rack.length !== S.snap.rack.length) return true;
+  const sig = t => JSON.stringify(t.map(s => [s.id, s.tiles.map(x => x.id)]));
+  return sig(S.table) !== sig(S.snap.table);
+}
+function disarmDraw(){
+  S.drawArmed = false;
+  document.getElementById("btnDraw").textContent = "抽一張牌";
+}
+
+function draw(){
+  if (S.over) return;
+  if (turnChanged() && !S.drawArmed){
+    S.drawArmed = true;
+    document.getElementById("btnDraw").textContent = "確定要抽牌？";
+    say("抽牌代表這回合放棄出牌，剛放上桌的牌會收回手上。想留著就按「結束回合」。要抽的話再按一次。", "warn");
+    return;
+  }
+  disarmDraw();
+  if (S.pool.length === 0){ finish(false); return; }
+  revert();
+  S.rack.push(S.pool.pop());
+  S.turn++;
+  snapshot();
+  render();
+  say("抽了一張，換下一回合。" + (S.pool.length ? "牌堆還剩 " + S.pool.length + " 張。" : "牌堆空了，接下來只能靠手上的牌。"));
+}
+
+function resetTurn(){
+  if (S.over) return;
+  disarmDraw();
+  revert();
+  render();
+  say("回到這回合開始的樣子。");
+}
+
+/* ── hints ─────────────────────────────── */
+function hint(){
+  if (S.over) return;
+  const rack = S.rack;
+  const found = [];
+
+  for (const c of COLORS){
+    const ns = [...new Set(rack.filter(t => t.color === c).map(t => t.num))].sort((a,b) => a-b);
+    let run = [];
+    for (let i=0;i<ns.length;i++){
+      if (i && ns[i] === ns[i-1]+1) run.push(ns[i]);
+      else { if (run.length >= 3) found.push(runLabel(c, run)); run = [ns[i]]; }
+    }
+    if (run.length >= 3) found.push(runLabel(c, run));
+  }
+  for (let n=1;n<=13;n++){
+    const cs = [...new Set(rack.filter(t => t.num === n).map(t => t.color))];
+    if (cs.length >= 3) found.push({text:n + " 的 " + cs.map(c => CN[c]).join("、"), value:n*cs.length});
+  }
+
+  if (!S.melded){
+    if (found.length){
+      found.sort((a,b) => b.value - a.value);
+      const best = found.slice(0,3).map(f => f.text + "（" + f.value + " 分）").join("、");
+      const sum = found.reduce((a,f) => a+f.value, 0);
+      say("手牌裡現成的組合：" + best + "。" + (sum >= 30 ? "湊得到 30 分。" : "加起來還不到 30 分，先抽牌吧。"));
+    } else {
+      say("手牌目前排不出任何一組，抽一張看看。");
+    }
+    return;
+  }
+
+  const ext = [];
+  for (const t of S.rack){
+    if (t.joker) continue;
+    for (const s of S.table){
+      if (analyze(s.tiles.concat([t])).valid){ ext.push(CN[t.color] + t.num); break; }
+    }
+  }
+  const bits = [];
+  if (ext.length) bits.push("可以直接接上桌面的：" + [...new Set(ext)].slice(0,6).join("、"));
+  if (found.length) bits.push("手牌自己能成組的：" + found.slice(0,3).map(f => f.text).join("、"));
+  say(bits.length ? bits.join("；") + "。" : "看起來得拆桌面重組，或是抽一張牌。");
+}
+function runLabel(c, run){
+  return {text: CN[c] + run[0] + "–" + run[run.length-1], value: run.reduce((a,b) => a+b, 0)};
+}
+
+/* ── sorting ───────────────────────────── */
+function sortRack(mode){
+  S.rack.sort((a,b) => {
+    if (a.joker !== b.joker) return a.joker ? 1 : -1;
+    if (mode === "color"){
+      const d = COLORS.indexOf(a.color) - COLORS.indexOf(b.color);
+      return d !== 0 ? d : a.num - b.num;
+    }
+    const d = a.num - b.num;
+    return d !== 0 ? d : COLORS.indexOf(a.color) - COLORS.indexOf(b.color);
+  });
+  render();
+}
+
+/* ── end of game ───────────────────────── */
+function readBest(){
+  try { const v = localStorage.getItem(BEST_KEY); return v ? parseInt(v,10) : null; }
+  catch(e){ return null; }
+}
+function writeBest(turns){
+  try {
+    const cur = readBest();
+    if (cur === null || turns < cur) localStorage.setItem(BEST_KEY, String(turns));
+  } catch(e){}
+}
+
+function finish(won){
+  S.over = true;
+  if (won) writeBest(S.turn);
+  const best = readBest();
+  document.getElementById("endTitle").textContent = won ? "打完了" : "牌堆見底";
+  document.getElementById("endText").textContent = won
+    ? "手牌清空，桌面每一組都成立。"
+    : "沒牌可抽，手上還有牌沒打出去。下一局換個下牌順序試試。";
+  document.getElementById("endTurns").textContent = S.turn;
+  document.getElementById("endLeft").textContent = S.rack.length;
+  document.getElementById("endBest").textContent = best === null ? "—" : best + " 回合";
+  document.getElementById("endVeil").hidden = false;
+  render();
+}
+
+/* ── new game ──────────────────────────── */
+function newGame(){
+  const deck = buildDeck();
+  S.rack = deck.splice(0,14);
+  S.pool = deck;
+  S.table = [];
+  S.melded = false;
+  S.turn = 1;
+  S.over = false;
+  S.sel = [];
+  S.nextSetId = 1;
+  disarmDraw();
+  sortRackSilent("num");
+  snapshot();
+  render();
+  say("先用手牌湊出合計 30 分的組合，才能開張。");
+}
+function sortRackSilent(mode){
+  S.rack.sort((a,b) => {
+    if (a.joker !== b.joker) return a.joker ? 1 : -1;
+    const d = a.num - b.num;
+    return d !== 0 ? d : COLORS.indexOf(a.color) - COLORS.indexOf(b.color);
+  });
+}
+
+/* ── wiring ────────────────────────────── */
+document.getElementById("btnNew").addEventListener("click", () => place("new"));
+document.getElementById("btnEnd").addEventListener("click", endTurn);
+document.getElementById("btnDraw").addEventListener("click", draw);
+document.getElementById("btnReset").addEventListener("click", resetTurn);
+document.getElementById("btnHint").addEventListener("click", hint);
+document.getElementById("btnRules").addEventListener("click", () => { document.getElementById("rulesVeil").hidden = false; });
+document.getElementById("btnRestart").addEventListener("click", () => {
+  document.getElementById("endVeil").hidden = true;
+  newGame();
+});
+document.getElementById("btnBack").addEventListener("click", reclaim);
+document.querySelectorAll(".sorts button[data-sort]").forEach(b => {
+  b.addEventListener("click", () => sortRack(b.dataset.sort));
+});
+document.querySelectorAll("[data-close]").forEach(b => {
+  b.addEventListener("click", e => {
+    const veil = e.target.closest(".veil");
+    veil.hidden = true;
+    if (veil.id === "endVeil") newGame();
+  });
+});
+document.querySelectorAll(".veil").forEach(v => {
+  v.addEventListener("click", e => { if (e.target === v && v.id === "rulesVeil") v.hidden = true; });
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape"){ S.sel = []; disarmDraw(); render(); }
+  if (e.key === "Enter" && document.getElementById("endVeil").hidden && document.getElementById("rulesVeil").hidden) endTurn();
+});
+
+newGame();
+})();
+</script>
+</body>
+</html>
