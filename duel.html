@@ -194,6 +194,20 @@ button{touch-action:manipulation}
   .rack{padding:9px 7px 11px}
   .msg{padding:0 11px;font-size:12px}
 }
+
+/* ── 設定：破冰門檻 ──────────────────────── */
+.seg.felt button{background:rgba(0,0,0,.25);color:var(--on-felt);border-color:rgba(255,255,255,.22)}
+.seg.felt button.on{background:var(--brass);color:#241a04;border-color:transparent}
+.setting.felt{background:transparent;border:0;padding:0;margin:14px 0 4px}
+.setting.felt .lbl{color:var(--on-felt-soft);font-weight:500;font-size:11.5px}
+.setting{margin:2px 0 16px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.setting .lbl{font-size:13px;font-weight:700;margin-bottom:8px}
+.seg{display:flex;gap:4px}
+.seg button{flex:1;padding:8px 4px;border-radius:7px;border:1px solid var(--line);
+  background:var(--btn);color:var(--btn-ink);font-size:12.5px}
+.seg button:hover{border-color:var(--brass)}
+.seg button.on{background:var(--brass);border-color:transparent;color:#241a04;font-weight:700}
+.setting .tip{margin:9px 0 0;font-size:11.5px;color:var(--ink-soft);line-height:1.55}
 </style>
 </head>
 <body>
@@ -241,7 +255,7 @@ button{touch-action:manipulation}
     <p class="lede">106 張牌：紅、藍、黑、橘各 1–13 兩套，再加 2 張鬼牌。兩人各拿 14 張，先把手牌出完的人贏。</p>
     <ul>
       <li><b>有效組合有兩種。</b>順子是同顏色的連號 3 張以上；同數組是同一個數字、不同顏色的 3 或 4 張。</li>
-      <li><b>第一次下牌要滿 30 分。</b>這一手只能用自己的牌組出新組合，不能碰桌面。兩人各自破冰。</li>
+      <li><b>第一次下牌要滿門檻分數。</b>這一手只能用自己的牌組出新組合，不能碰桌面，兩人各自破冰。門檻由開房的人決定，預設 30 分，也可以關掉。</li>
       <li><b>破冰之後桌面就開放了。</b>可以拆開重組任何一組（包括對方放的），只要回合結束時每組都成立，而且至少放下 1 張手牌。</li>
       <li><b>一個回合只能二選一：出牌或抽牌。</b>抽牌代表放棄出牌，桌面會回到回合開始的樣子。</li>
       <li><b>牌堆抽完後</b>出不了牌就「過」。兩人連續過，牌局結束，手上剩餘點數低的人贏（鬼牌算 30 分）。</li>
@@ -274,6 +288,15 @@ const CN = {red:"紅",blue:"藍",black:"黑",orange:"橘"};
 const JOKER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8.4 14.2c.9 1.3 2.1 2 3.6 2s2.7-.7 3.6-2"/><circle cx="9" cy="9.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="9.6" r="1.1" fill="currentColor" stroke="none"/></svg>';
 const PREFIX = "rmk-";                       // 在公用 broker 上避開別人的房號
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const MIN_KEY = "rummikub-meld-min-v1";
+function readMin(){
+  try {
+    const v = parseInt(localStorage.getItem(MIN_KEY), 10);
+    return (v === 0 || v === 30 || v === 50) ? v : 30;
+  } catch(e){ return 30; }
+}
+function writeMin(v){ try { localStorage.setItem(MIN_KEY, String(v)); } catch(e){} }
+const minWord = v => v === 0 ? "不用破冰" : v + " 分";
 
 function decode(c){
   if (c >= 104) return {id:c, joker:true, color:"joker", num:0};
@@ -335,10 +358,10 @@ const asTiles = codes => codes.map(decode);
 
 /* ═══ 莊家持有的牌局 ═══════════════════════ */
 let G = null;   // 只有莊家有
-function deal(firstMover){
+function deal(firstMover, min){
   const deck = freshDeck();
   return {
-    rev:1, phase:"playing",
+    rev:1, phase:"playing", meldMin: (min == null ? 30 : min),
     pool:deck.slice(28), table:[],
     hands:{h:deck.slice(0,14), g:deck.slice(14,28)},
     melded:{h:false,g:false},
@@ -351,7 +374,7 @@ function tally(g){
 function viewFor(role){
   const foe = role === "h" ? "g" : "h";
   const v = {
-    rev:G.rev, phase:G.phase, table:G.table, hand:G.hands[role],
+    rev:G.rev, phase:G.phase, table:G.table, hand:G.hands[role], meldMin:G.meldMin,
     poolCount:G.pool.length, foeCount:G.hands[foe].length,
     yourTurn:G.turn === role, youMelded:G.melded[role], foeMelded:G.melded[foe],
     last:G.last, over:null
@@ -400,13 +423,13 @@ function applyMove(role, m){
   if (badSet) return "有組合不成立";
   const played = G.hands[role].length - hand.length;
 
-  if (!G.melded[role]){
+  if (!G.melded[role] && G.meldMin > 0){
     const oldCodes = new Set([].concat.apply([], G.table));
     const touched = table.filter(s => s.some(c => oldCodes.has(c)));
     if (sig2(touched) !== sig2(G.table)) return "破冰前不能動桌上的牌";
     const fresh = table.filter(s => !s.some(c => oldCodes.has(c)));
     const total = fresh.reduce((a,s) => a + analyze(asTiles(s)).value, 0);
-    if (total < 30) return "破冰要滿 30 分";
+    if (total < G.meldMin) return "破冰要滿 " + G.meldMin + " 分";
   } else if (played <= 0) return "至少要打出 1 張手牌";
 
   G.table = table; G.hands[role] = hand;
@@ -432,7 +455,8 @@ const S = {
   view:null,
   rev:-1,
   rack:[], board:[], baseTable:[], baseRack:[], baseTileIds:new Set(),
-  sel:[], nextSetId:1, drawArmed:false, busy:false
+  sel:[], nextSetId:1, drawArmed:false, busy:false,
+  meldMin:readMin()      // 只有開房的人用得到
 };
 
 function say(t, tone){
@@ -442,6 +466,8 @@ function say(t, tone){
 }
 const myTurn = () => S.screen === "game" && S.view && S.view.phase === "playing"
   && S.view.yourTurn && S.conn === "connected";
+const viewMin = () => (S.view && S.view.meldMin != null) ? S.view.meldMin : 30;
+const iMelded = () => viewMin() === 0 || (S.view && S.view.youMelded);
 
 function adopt(v){
   S.view = v; S.rev = v.rev; S.sel = []; S.nextSetId = 1; S.drawArmed = false;
@@ -495,7 +521,7 @@ function hostRoom(){
     if (link && link.open){ try { c.close(); } catch(e){} return; }
     link = c;
     c.on("open", () => {
-      if (!G) G = deal("h");
+      if (!G) G = deal("h", S.meldMin);
       S.screen = "game";
       setConn("connected");
       pushState();
@@ -553,7 +579,7 @@ function onGuestData(d){                       // 莊家收到客人的動作
     if (err) send({t:"reject", why:err});
     pushState();
   } else if (d.t === "rematch"){
-    G = deal(G && G.over && G.over.winner !== "tie" && G.over.winner === "h" ? "g" : "h");
+    G = deal(G && G.over && G.over.winner === "h" ? "g" : "h", G ? G.meldMin : S.meldMin);
     pushState();
     say("新的一局開始了。", "good");
   } else if (d.t === "hello"){
@@ -581,12 +607,12 @@ function commit(){
   if (!myTurn() || S.busy) return;
   const bad = S.board.filter(s => !analyze(s.tiles).valid);
   const played = S.baseRack.length - S.rack.length;
-  if (!S.view.youMelded){
+  if (!iMelded()){
     const fresh = S.board.filter(s => !s.tiles.some(t => S.baseTileIds.has(t.id)));
     if (!fresh.length){ say("還沒放下任何牌。湊不出來就抽一張。", "warn"); return; }
     if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); return; }
     const total = fresh.reduce((a,s) => a + analyze(s.tiles).value, 0);
-    if (total < 30){ say("破冰要一次滿 30 分，現在只有 " + total + " 分。", "warn"); return; }
+    if (total < viewMin()){ say("破冰要一次滿 " + viewMin() + " 分，現在只有 " + total + " 分。", "warn"); return; }
   } else {
     if (played <= 0){ say("這回合得至少放下 1 張手牌。", "warn"); return; }
     if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); return; }
@@ -650,8 +676,8 @@ function pick(tid){
   if (i >= 0){ S.sel.splice(i,1); render(); return; }
   const loc = locate(tid);
   if (!loc) return;
-  if (loc.where === "table" && !S.view.youMelded && S.baseTileIds.has(tid)){
-    say("你還沒破冰，不能動桌上的牌。先用手牌湊出 30 分。", "warn"); return;
+  if (loc.where === "table" && !iMelded() && S.baseTileIds.has(tid)){
+    say("你還沒破冰，不能動桌上的牌。先用手牌湊出 " + viewMin() + " 分。", "warn"); return;
   }
   S.sel.push(tid); render(); say("");
 }
@@ -660,7 +686,7 @@ function place(target){
   disarmDraw();
   if (!S.sel.length){ say("先點幾張牌選起來。", "warn"); return; }
   const tgt = S.board.find(x => x.id === target);
-  if (tgt && !S.view.youMelded && tgt.tiles.some(t => S.baseTileIds.has(t.id))){
+  if (tgt && !iMelded() && tgt.tiles.some(t => S.baseTileIds.has(t.id))){
     say("破冰之前不能往桌上的組合加牌，只能自己排新的一組。", "warn"); return;
   }
   const moving = takeSelected();
@@ -713,12 +739,12 @@ function hint(){
     const cs = [...new Set(S.rack.filter(t => !t.joker && t.num === n).map(t => t.color))];
     if (cs.length >= 3) found.push({text:n + " 的 " + cs.map(c => CN[c]).join("、"), value:n*cs.length});
   }
-  if (!S.view.youMelded){
+  if (!iMelded()){
     if (found.length){
       found.sort((a,b) => b.value - a.value);
       const sum = found.reduce((a,f) => a+f.value, 0);
       say("手牌裡現成的組合：" + found.slice(0,3).map(f => f.text+"（"+f.value+" 分）").join("、") +
-        "。" + (sum >= 30 ? "湊得到 30 分。" : "加起來還不到 30 分。"));
+        "。" + (sum >= viewMin() ? "湊得到 " + viewMin() + " 分。" : "加起來還不到 " + viewMin() + " 分。"));
     } else say("手牌目前排不出任何一組，抽一張看看。");
     return;
   }
@@ -761,7 +787,7 @@ function lobbyScreen(board){
   if (S.conn === "waiting"){
     box.innerHTML = '<h2>房間開好了</h2><p>把這組房號告訴對手，他輸入就進得來。</p>' +
       '<div class="code">' + S.code + '</div>' +
-      '<p class="hint">這個頁面要一直開著。你關掉，房間就沒了。</p>';
+      '<p class="hint">破冰門檻：' + minWord(S.meldMin) + '。這個頁面要一直開著，你關掉房間就沒了。</p>';
     const row = document.createElement("div");
     row.className = "row";
     const cp = document.createElement("button");
@@ -800,6 +826,25 @@ function lobbyScreen(board){
     box.appendChild(e);
   }
 
+  const setting = document.createElement("div");
+  setting.className = "setting felt";
+  const lbl = document.createElement("div");
+  lbl.className = "lbl";
+  lbl.textContent = "破冰門檻（由開房的人決定）";
+  setting.appendChild(lbl);
+  const seg = document.createElement("div");
+  seg.className = "seg felt";
+  [[0,"不用破冰"],[30,"30 分"],[50,"50 分"]].forEach(pair => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = pair[1];
+    if (pair[0] === S.meldMin) b.classList.add("on");
+    b.addEventListener("click", () => { S.meldMin = pair[0]; writeMin(pair[0]); render(); });
+    seg.appendChild(b);
+  });
+  setting.appendChild(seg);
+  box.appendChild(setting);
+
   const r1 = document.createElement("div");
   r1.className = "row";
   const mk = document.createElement("button");
@@ -835,7 +880,9 @@ function render(){
     if (!S.board.length){
       const p = document.createElement("p");
       p.className = "empty-board";
-      p.textContent = "桌面還是空的。湊出合計 30 分的組合就能開張。";
+      p.textContent = viewMin() === 0
+        ? "桌面還是空的。湊出任何一組就能放上來。"
+        : "桌面還是空的。湊出合計 " + viewMin() + " 分的組合就能開張。";
       board.appendChild(p);
     }
     for (const s of S.board){
@@ -926,7 +973,7 @@ function showOver(){
 }
 function rematch(){
   if (S.role === "h"){
-    G = deal(G && G.over && G.over.winner === "h" ? "g" : "h");
+    G = deal(G && G.over && G.over.winner === "h" ? "g" : "h", G ? G.meldMin : S.meldMin);
     pushState();
     say("新的一局開始了。", "good");
   } else {

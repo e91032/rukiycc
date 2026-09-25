@@ -306,6 +306,16 @@ button{touch-action:manipulation}
   .rack{padding:9px 7px 11px}
   .msg{padding:0 11px;font-size:12px}
 }
+
+/* ── 設定：破冰門檻 ──────────────────────── */
+.setting{margin:2px 0 16px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.setting .lbl{font-size:13px;font-weight:700;margin-bottom:8px}
+.seg{display:flex;gap:4px}
+.seg button{flex:1;padding:8px 4px;border-radius:7px;border:1px solid var(--line);
+  background:var(--btn);color:var(--btn-ink);font-size:12.5px}
+.seg button:hover{border-color:var(--brass)}
+.seg button.on{background:var(--brass);border-color:transparent;color:#241a04;font-weight:700}
+.setting .tip{margin:9px 0 0;font-size:11.5px;color:var(--ink-soft);line-height:1.55}
 </style>
 </head>
 <body>
@@ -358,13 +368,22 @@ button{touch-action:manipulation}
     <p class="lede">106 張牌：紅、藍、黑、橘各 1–13 兩套，再加 2 張鬼牌。把手上 14 張牌全部打完就贏了。</p>
     <ul>
       <li><b>有效組合有兩種。</b>順子是同顏色的連號 3 張以上；同數組是同一個數字、不同顏色的 3 或 4 張。</li>
-      <li><b>第一次下牌要滿 30 分。</b>這一手只能用自己的牌組出新組合，不能碰桌面，合計點數要達到 30。</li>
+      <li><b>第一次下牌要滿門檻分數。</b>這一手只能用自己的牌組出新組合，不能碰桌面。預設 30 分，可以在下面調整，或乾脆關掉。</li>
       <li><b>破冰之後桌面就開放了。</b>你可以把桌上的牌拆開重組、借來接龍，只要回合結束時每一組都成立，而且至少放下了 1 張手牌。</li>
       <li><b>鬼牌代替任何一張牌。</b>它會自動算成對你最有利的數字。</li>
       <li><b>一個回合只能二選一：出牌或抽牌。</b>抽牌代表這回合放棄出牌，桌面會回到回合開始的樣子，剛放上去的牌收回手上。排好了要留著，按的是「結束回合」。</li>
       <li><b>牌堆抽完還沒打完手牌</b>，這局就結束了。</li>
       <li><b>操作方式：</b>點牌選取，再點某一組的「加入這組」，或按「排成新組合」。這回合剛放上桌的牌（底下有金線）隨時能按「收回手上」拿回來，回合一結束就收不回了。</li>
     </ul>
+    <div class="setting">
+      <div class="lbl">破冰門檻</div>
+      <div class="seg" id="segMeld">
+        <button type="button" data-min="0">不用破冰</button>
+        <button type="button" data-min="30">30 分</button>
+        <button type="button" data-min="50">50 分</button>
+      </div>
+      <p class="tip" id="segTip"></p>
+    </div>
     <button class="close" data-close>開始吧</button>
   </div>
 </div>
@@ -390,11 +409,21 @@ const COLORS = ["red","blue","black","orange"];
 const CN = {red:"紅",blue:"藍",black:"黑",orange:"橘"};
 const JOKER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8.4 14.2c.9 1.3 2.1 2 3.6 2s2.7-.7 3.6-2"/><circle cx="9" cy="9.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="15" cy="9.6" r="1.1" fill="currentColor" stroke="none"/></svg>';
 const BEST_KEY = "rummikub-solo-best-v1";
+const MIN_KEY = "rummikub-meld-min-v1";
+
+function readMin(){
+  try {
+    const v = parseInt(localStorage.getItem(MIN_KEY), 10);
+    return (v === 0 || v === 30 || v === 50) ? v : 30;
+  } catch(e){ return 30; }
+}
+function writeMin(v){ try { localStorage.setItem(MIN_KEY, String(v)); } catch(e){} }
 
 let uid = 0;
 const S = {
   pool:[], rack:[], table:[], melded:false, turn:1, over:false,
-  sel:[], snap:null, snapSetIds:new Set(), snapTileIds:new Set(), nextSetId:1
+  sel:[], snap:null, snapSetIds:new Set(), snapTileIds:new Set(), nextSetId:1,
+  meldMin:readMin()
 };
 
 /* ── deck ──────────────────────────────── */
@@ -542,7 +571,9 @@ function render(){
   if (S.table.length === 0){
     const p = document.createElement("p");
     p.className = "empty-board";
-    p.textContent = "桌面還是空的。挑出一組順子或同數組，湊滿 30 分就能開張。";
+    p.textContent = S.meldMin === 0
+      ? "桌面還是空的。挑出一組順子或同數組放上來。"
+      : "桌面還是空的。挑出一組順子或同數組，湊滿 " + S.meldMin + " 分就能開張。";
     board.appendChild(p);
   }
 
@@ -586,15 +617,18 @@ function render(){
   document.getElementById("statPool").textContent = S.pool.length;
 
   const chip = document.getElementById("meldChip");
-  if (S.melded){
+  if (S.meldMin === 0){
+    chip.className = "chip open";
+    chip.innerHTML = "<b>自由出牌</b>沒有門檻";
+  } else if (S.melded){
     chip.className = "chip open";
     chip.innerHTML = "<b>已破冰</b>桌面開放";
   } else {
     const pending = pendingMeldValue();
     chip.className = "chip locked";
     chip.innerHTML = pending > 0
-      ? "<b>" + pending + " / 30</b>破冰"
-      : "<b>破冰</b>還差 30 分";
+      ? "<b>" + pending + " / " + S.meldMin + "</b>破冰"
+      : "<b>破冰</b>還差 " + S.meldMin + " 分";
   }
 
   const note = document.getElementById("selNote");
@@ -621,7 +655,7 @@ function pick(tid){
   const loc = locate(tid);
   if (!loc) return;
   if (loc.where === "table" && !S.melded && S.snapSetIds.has(loc.set.id)){
-    say("破冰之前不能動桌上的牌。先用手牌湊出 30 分。", "warn");
+    say("破冰之前不能動桌上的牌。先用手牌湊出 " + S.meldMin + " 分。", "warn");
     return;
   }
   S.sel.push(tid);
@@ -681,7 +715,7 @@ function endTurn(){
     if (fresh.length === 0){ say("還沒放下任何牌。湊不出來就抽一張。", "warn"); return; }
     if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); return; }
     const total = fresh.reduce((a,s) => a + analyze(s.tiles).value, 0);
-    if (total < 30){ say("破冰要一次滿 30 分，現在只有 " + total + " 分。", "warn"); return; }
+    if (total < S.meldMin){ say("破冰要一次滿 " + S.meldMin + " 分，現在只有 " + total + " 分。", "warn"); return; }
     S.melded = true;
     commit("破冰成功，" + total + " 分。桌面開放了。");
     return;
@@ -766,7 +800,7 @@ function hint(){
       found.sort((a,b) => b.value - a.value);
       const best = found.slice(0,3).map(f => f.text + "（" + f.value + " 分）").join("、");
       const sum = found.reduce((a,f) => a+f.value, 0);
-      say("手牌裡現成的組合：" + best + "。" + (sum >= 30 ? "湊得到 30 分。" : "加起來還不到 30 分，先抽牌吧。"));
+      say("手牌裡現成的組合：" + best + "。" + (sum >= S.meldMin ? "湊得到 " + S.meldMin + " 分。" : "加起來還不到 " + S.meldMin + " 分，先抽牌吧。"));
     } else {
       say("手牌目前排不出任何一組，抽一張看看。");
     }
@@ -804,14 +838,15 @@ function sortRack(mode){
 }
 
 /* ── end of game ───────────────────────── */
+const bestKey = () => BEST_KEY + ":" + S.meldMin;
 function readBest(){
-  try { const v = localStorage.getItem(BEST_KEY); return v ? parseInt(v,10) : null; }
+  try { const v = localStorage.getItem(bestKey()); return v ? parseInt(v,10) : null; }
   catch(e){ return null; }
 }
 function writeBest(turns){
   try {
     const cur = readBest();
-    if (cur === null || turns < cur) localStorage.setItem(BEST_KEY, String(turns));
+    if (cur === null || turns < cur) localStorage.setItem(bestKey(), String(turns));
   } catch(e){}
 }
 
@@ -836,7 +871,7 @@ function newGame(){
   S.rack = deck.splice(0,14);
   S.pool = deck;
   S.table = [];
-  S.melded = false;
+  S.melded = (S.meldMin === 0);
   S.turn = 1;
   S.over = false;
   S.sel = [];
@@ -845,7 +880,9 @@ function newGame(){
   sortRackSilent("num");
   snapshot();
   render();
-  say("先用手牌湊出合計 30 分的組合，才能開張。");
+  say(S.meldMin === 0
+    ? "沒有破冰門檻，湊出任何一組就能放上桌。"
+    : "先用手牌湊出合計 " + S.meldMin + " 分的組合，才能開張。");
 }
 function sortRackSilent(mode){
   S.rack.sort((a,b) => {
@@ -855,13 +892,45 @@ function sortRackSilent(mode){
   });
 }
 
+/* ── 破冰門檻設定 ──────────────────────── */
+const TIPS = {
+  0:"完全不用破冰，湊出任何一組就能放上桌。最輕鬆，適合純粹想排牌。",
+  30:"標準規則。第一次下牌必須一次打出合計 30 分以上，且只能用自己的手牌。",
+  50:"門檻拉高到 50 分，開局要忍更久，後面的翻盤空間也更大。"
+};
+function paintSeg(){
+  document.querySelectorAll("#segMeld button").forEach(b => {
+    b.classList.toggle("on", parseInt(b.dataset.min,10) === S.meldMin);
+  });
+  const best = readBest();
+  document.getElementById("segTip").textContent =
+    TIPS[S.meldMin] + "（這個門檻的最佳紀錄：" + (best === null ? "還沒有" : best + " 回合") + "）";
+}
+function setMeldMin(v){
+  if (v === S.meldMin){ return; }
+  S.meldMin = v;
+  writeMin(v);
+  if (v === 0) S.melded = true;
+  paintSeg();
+  render();
+  say(v === 0 ? "破冰關掉了，現在湊出任何一組都能放上桌。"
+              : (S.melded ? "門檻改成 " + v + " 分，不過你這局已經破冰了。"
+                          : "門檻改成 " + v + " 分。"));
+}
+document.querySelectorAll("#segMeld button").forEach(b => {
+  b.addEventListener("click", () => setMeldMin(parseInt(b.dataset.min,10)));
+});
+
 /* ── wiring ────────────────────────────── */
 document.getElementById("btnNew").addEventListener("click", () => place("new"));
 document.getElementById("btnEnd").addEventListener("click", endTurn);
 document.getElementById("btnDraw").addEventListener("click", draw);
 document.getElementById("btnReset").addEventListener("click", resetTurn);
 document.getElementById("btnHint").addEventListener("click", hint);
-document.getElementById("btnRules").addEventListener("click", () => { document.getElementById("rulesVeil").hidden = false; });
+document.getElementById("btnRules").addEventListener("click", () => {
+  paintSeg();
+  document.getElementById("rulesVeil").hidden = false;
+});
 document.getElementById("btnRestart").addEventListener("click", () => {
   document.getElementById("endVeil").hidden = true;
   newGame();
