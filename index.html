@@ -308,6 +308,14 @@ button{touch-action:manipulation}
 }
 
 /* ── 設定：破冰門檻 ──────────────────────── */
+.chip.tappable{cursor:pointer;position:relative;padding-right:20px}
+.chip.tappable::after{
+  content:"";position:absolute;right:8px;top:50%;margin-top:-2px;
+  border:3.5px solid transparent;border-top-color:currentColor;opacity:.55}
+.chip.tappable:hover{filter:brightness(1.06)}
+.chip.tappable:active{transform:scale(.97)}
+#setVeil .seg{margin-top:2px}
+#setVeil .tip{margin:12px 0 0;font-size:12px;color:var(--ink-soft);line-height:1.6}
 .setting{margin:2px 0 16px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
 .setting .lbl{font-size:13px;font-weight:700;margin-bottom:8px}
 .seg{display:flex;gap:4px}
@@ -326,7 +334,7 @@ button{touch-action:manipulation}
       <div class="chip"><b id="statTurn">1</b>回合</div>
       <div class="chip"><b id="statRack">14</b>手牌</div>
       <div class="chip"><b id="statPool">92</b>牌堆</div>
-      <div class="chip locked" id="meldChip"><b>破冰</b>還差 30 分</div>
+      <button class="chip locked tappable" id="meldChip" aria-haspopup="dialog"><b>破冰</b>還差 30 分</button>
     </div>
   </header>
 
@@ -368,23 +376,28 @@ button{touch-action:manipulation}
     <p class="lede">106 張牌：紅、藍、黑、橘各 1–13 兩套，再加 2 張鬼牌。把手上 14 張牌全部打完就贏了。</p>
     <ul>
       <li><b>有效組合有兩種。</b>順子是同顏色的連號 3 張以上；同數組是同一個數字、不同顏色的 3 或 4 張。</li>
-      <li><b>第一次下牌要滿門檻分數。</b>這一手只能用自己的牌組出新組合，不能碰桌面。預設 30 分，可以在下面調整，或乾脆關掉。</li>
+      <li><b>第一次下牌要滿門檻分數。</b>這一手只能用自己的牌組出新組合，不能碰桌面。預設 30 分，點頁首那個破冰標籤就能改，或乾脆關掉。</li>
       <li><b>破冰之後桌面就開放了。</b>你可以把桌上的牌拆開重組、借來接龍，只要回合結束時每一組都成立，而且至少放下了 1 張手牌。</li>
       <li><b>鬼牌代替任何一張牌。</b>它會自動算成對你最有利的數字。</li>
       <li><b>一個回合只能二選一：出牌或抽牌。</b>抽牌代表這回合放棄出牌，桌面會回到回合開始的樣子，剛放上去的牌收回手上。排好了要留著，按的是「結束回合」。</li>
       <li><b>牌堆抽完還沒打完手牌</b>，這局就結束了。</li>
       <li><b>操作方式：</b>點牌選取，再點某一組的「加入這組」，或按「排成新組合」。這回合剛放上桌的牌（底下有金線）隨時能按「收回手上」拿回來，回合一結束就收不回了。</li>
     </ul>
-    <div class="setting">
-      <div class="lbl">破冰門檻</div>
-      <div class="seg" id="segMeld">
-        <button type="button" data-min="0">不用破冰</button>
-        <button type="button" data-min="30">30 分</button>
-        <button type="button" data-min="50">50 分</button>
-      </div>
-      <p class="tip" id="segTip"></p>
-    </div>
     <button class="close" data-close>開始吧</button>
+  </div>
+</div>
+
+<div class="veil" id="setVeil" hidden>
+  <div class="sheet">
+    <h2>破冰門檻</h2>
+    <p class="lede">第一次下牌要湊到多少分才能開張。隨時可以改，改了立刻生效。</p>
+    <div class="seg" id="segMeld">
+      <button type="button" data-min="0">不用破冰</button>
+      <button type="button" data-min="30">30 分</button>
+      <button type="button" data-min="50">50 分</button>
+    </div>
+    <p class="tip" id="segTip"></p>
+    <button class="close" data-close style="margin-top:18px">好</button>
   </div>
 </div>
 
@@ -618,14 +631,14 @@ function render(){
 
   const chip = document.getElementById("meldChip");
   if (S.meldMin === 0){
-    chip.className = "chip open";
+    chip.className = "chip open tappable";
     chip.innerHTML = "<b>自由出牌</b>沒有門檻";
   } else if (S.melded){
-    chip.className = "chip open";
+    chip.className = "chip open tappable";
     chip.innerHTML = "<b>已破冰</b>桌面開放";
   } else {
     const pending = pendingMeldValue();
-    chip.className = "chip locked";
+    chip.className = "chip locked tappable";
     chip.innerHTML = pending > 0
       ? "<b>" + pending + " / " + S.meldMin + "</b>破冰"
       : "<b>破冰</b>還差 " + S.meldMin + " 分";
@@ -928,8 +941,11 @@ document.getElementById("btnDraw").addEventListener("click", draw);
 document.getElementById("btnReset").addEventListener("click", resetTurn);
 document.getElementById("btnHint").addEventListener("click", hint);
 document.getElementById("btnRules").addEventListener("click", () => {
-  paintSeg();
   document.getElementById("rulesVeil").hidden = false;
+});
+document.getElementById("meldChip").addEventListener("click", () => {
+  paintSeg();
+  document.getElementById("setVeil").hidden = false;
 });
 document.getElementById("btnRestart").addEventListener("click", () => {
   document.getElementById("endVeil").hidden = true;
@@ -947,7 +963,9 @@ document.querySelectorAll("[data-close]").forEach(b => {
   });
 });
 document.querySelectorAll(".veil").forEach(v => {
-  v.addEventListener("click", e => { if (e.target === v && v.id === "rulesVeil") v.hidden = true; });
+  v.addEventListener("click", e => {
+    if (e.target === v && (v.id === "rulesVeil" || v.id === "setVeil")) v.hidden = true;
+  });
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape"){ S.sel = []; disarmDraw(); render(); }
