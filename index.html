@@ -324,6 +324,14 @@ button{touch-action:manipulation}
 .seg button:hover{border-color:var(--brass)}
 .seg button.on{background:var(--brass);border-color:transparent;color:#241a04;font-weight:700}
 .setting .tip{margin:9px 0 0;font-size:11.5px;color:var(--ink-soft);line-height:1.55}
+
+/* ── 確認對話框 ──────────────────────────── */
+.ask-row{display:flex;gap:8px;margin-top:2px}
+.ask-row button{flex:1;padding:12px 10px;border-radius:9px;font-weight:600;font-size:14px}
+.ask-row .ghost{background:var(--btn);color:var(--btn-ink);border:1px solid var(--line)}
+.ask-row .ghost:hover{border-color:var(--brass)}
+.ask-row .danger{background:var(--alert);color:#fff3ee;border:1px solid transparent}
+.ask-row .danger:hover{filter:brightness(1.08)}
 </style>
 </head>
 <body>
@@ -398,6 +406,17 @@ button{touch-action:manipulation}
     </div>
     <p class="tip" id="segTip"></p>
     <button class="close" data-close style="margin-top:18px">好</button>
+  </div>
+</div>
+
+<div class="veil" id="askVeil" hidden>
+  <div class="sheet">
+    <h2 id="askTitle"></h2>
+    <p class="lede" id="askText"></p>
+    <div class="ask-row">
+      <button id="askNo" class="ghost">取消</button>
+      <button id="askYes" class="danger"></button>
+    </div>
   </div>
 </div>
 
@@ -934,6 +953,29 @@ document.querySelectorAll("#segMeld button").forEach(b => {
   b.addEventListener("click", () => setMeldMin(parseInt(b.dataset.min,10)));
 });
 
+/* ── 確認對話框 ──────────────────────────── */
+let askAction = null;
+function ask(title, text, yesLabel, fn){
+  document.getElementById("askTitle").textContent = title;
+  document.getElementById("askText").textContent = text;
+  document.getElementById("askYes").textContent = yesLabel;
+  askAction = fn;
+  document.getElementById("askVeil").hidden = false;
+}
+function closeAsk(){
+  document.getElementById("askVeil").hidden = true;
+  askAction = null;
+}
+document.getElementById("askNo").addEventListener("click", closeAsk);
+document.getElementById("askYes").addEventListener("click", () => {
+  const fn = askAction;
+  closeAsk();
+  if (fn) fn();
+});
+document.getElementById("askVeil").addEventListener("click", e => {
+  if (e.target.id === "askVeil") closeAsk();
+});
+
 /* ── wiring ────────────────────────────── */
 document.getElementById("btnNew").addEventListener("click", () => place("new"));
 document.getElementById("btnEnd").addEventListener("click", endTurn);
@@ -949,7 +991,11 @@ document.getElementById("meldChip").addEventListener("click", () => {
 });
 document.getElementById("btnRestart").addEventListener("click", () => {
   document.getElementById("endVeil").hidden = true;
-  newGame();
+  const untouched = S.turn === 1 && S.table.length === 0 && S.rack.length === 14;
+  if (S.over || untouched){ newGame(); return; }
+  ask("重新開局？",
+      "現在這局會直接作廢：桌上的牌、手裡的 " + S.rack.length + " 張，還有已經打過的 " + S.turn + " 個回合都會清掉，重新洗牌發牌。",
+      "重新開局", newGame);
 });
 document.getElementById("btnBack").addEventListener("click", reclaim);
 document.querySelectorAll(".sorts button[data-sort]").forEach(b => {
