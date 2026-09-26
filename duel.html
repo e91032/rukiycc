@@ -216,6 +216,58 @@ button{touch-action:manipulation}
 .ask-row .ghost:hover{border-color:var(--brass)}
 .ask-row .danger{background:var(--alert);color:#fff3ee;border:1px solid transparent}
 .ask-row .danger:hover{filter:brightness(1.08)}
+
+/* ── 動態 ────────────────────────────────── */
+/* 牌「抵達」新位置時才播：抽到新牌、從手上放到桌面、
+   或對手出完牌之後傳過來的桌面。純粹重畫不會觸發。 */
+.tile.enter{animation:tileIn .26s cubic-bezier(.34,1.32,.64,1) backwards}
+@keyframes tileIn{
+  from{opacity:0;transform:translateY(-15px) scale(.88)}
+  55%{opacity:1}
+  to{opacity:1;transform:none}
+}
+.tile:not(:disabled):active{transform:translateY(-4px) scale(.96)}
+
+/* 組合不成立時抖一下 */
+.set.shake{animation:shake .42s cubic-bezier(.36,.07,.19,.97)}
+@keyframes shake{
+  10%,90%{transform:translateX(-2px)}
+  20%,80%{transform:translateX(3px)}
+  30%,50%,70%{transform:translateX(-4px)}
+  40%,60%{transform:translateX(4px)}
+}
+
+/* 選了牌之後，新組合那格會呼吸 */
+.new-slot.hot{animation:slotPulse 1.7s ease-in-out infinite}
+@keyframes slotPulse{
+  0%,100%{border-color:var(--brass)}
+  50%{border-color:rgba(194,146,47,.4)}
+}
+
+/* 輪到誰 */
+.seat.active{animation:seatPulse 2.6s ease-in-out infinite}
+@keyframes seatPulse{
+  0%,100%{box-shadow:0 0 0 1px var(--brass)}
+  50%{box-shadow:0 0 0 1px var(--brass),0 0 11px rgba(194,146,47,.45)}
+}
+
+/* 訊息換了就淡入，比較不會漏看 */
+.msg.flash{animation:msgIn .28s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+
+/* 面板 */
+.veil{animation:veilIn .18s ease}
+@keyframes veilIn{from{opacity:0}to{opacity:1}}
+.sheet{animation:sheetIn .28s cubic-bezier(.2,.9,.3,1)}
+@keyframes sheetIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+.result{animation:resultIn .42s .06s cubic-bezier(.34,1.4,.64,1) backwards}
+@keyframes resultIn{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:none}}
+
+.actions button:active:not(:disabled){transform:translateY(1px)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
 </style>
 </head>
 <body>
@@ -482,6 +534,9 @@ function say(t, tone){
   const el = document.getElementById("msg");
   el.textContent = t || "";
   el.className = "msg" + (tone ? " " + tone : "");
+  el.classList.remove("flash");
+  void el.offsetWidth;
+  if (el.textContent.trim()) el.classList.add("flash");
 }
 const myTurn = () => S.screen === "game" && S.view && S.view.phase === "playing"
   && S.view.yourTurn && S.conn === "connected";
@@ -629,12 +684,12 @@ function commit(){
   if (!iMelded()){
     const fresh = S.board.filter(s => !s.tiles.some(t => S.baseTileIds.has(t.id)));
     if (!fresh.length){ say("還沒放下任何牌。湊不出來就抽一張。", "warn"); return; }
-    if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); return; }
+    if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); shakeBad(); return; }
     const total = fresh.reduce((a,s) => a + analyze(s.tiles).value, 0);
     if (total < viewMin()){ say("破冰要一次滿 " + viewMin() + " 分，現在只有 " + total + " 分。", "warn"); return; }
   } else {
     if (played <= 0){ say("這回合得至少放下 1 張手牌。", "warn"); return; }
-    if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); return; }
+    if (bad.length){ say("有 " + bad.length + " 組還不成立，紅框那幾組要再調整。", "warn"); shakeBad(); return; }
   }
   const move = {t:"move", kind:"end",
     table:S.board.map(s => analyze(s.tiles).laid.map(x => x.tile.id)),
@@ -783,6 +838,12 @@ function runLabel(c, run){ return {text:CN[c]+run[0]+"–"+run[run.length-1], va
 function tileButton(tile, laid, onTable){
   const b = document.createElement("button");
   b.className = "tile" + (tile.joker ? " joker" : "");
+  const spot = onTable ? "table" : "rack";
+  if (lastLoc[tile.id] !== spot){
+    b.classList.add("enter");
+    b.style.animationDelay = (Math.min(enterN++, 13) * 30) + "ms";
+  }
+  nowLoc[tile.id] = spot;
   b.dataset.color = tile.joker ? "joker" : tile.color;
   if (S.sel.includes(tile.id)) b.classList.add("sel");
   if (onTable && !S.baseTileIds.has(tile.id)) b.classList.add("fresh");
@@ -1023,6 +1084,23 @@ document.getElementById("askYes").addEventListener("click", () => {
 document.getElementById("askVeil").addEventListener("click", e => {
   if (e.target.id === "askVeil") closeAsk();
 });
+
+/* ── 動態：判斷哪些牌是「剛抵達」的 ───────── */
+let lastLoc = {}, nowLoc = {}, enterN = 0;
+const _renderInner = render;
+render = function(){
+  nowLoc = {}; enterN = 0;
+  _renderInner();
+  lastLoc = nowLoc;
+};
+function shakeBad(){
+  document.querySelectorAll(".set.bad").forEach(el => {
+    el.classList.remove("shake");
+    void el.offsetWidth;                       // 強制重排，動畫才會重播
+    el.classList.add("shake");
+    setTimeout(() => el.classList.remove("shake"), 460);
+  });
+}
 
 /* ═══ 接線 ═══════════════════════════════════ */
 document.getElementById("btnNew").addEventListener("click", () => place("new"));
