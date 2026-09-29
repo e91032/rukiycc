@@ -688,6 +688,7 @@ function render(){
 
     const row = document.createElement("div");
     row.className = "set-tiles";
+    row.dataset.set = s.id;
     const order = info.valid ? info.laid : s.tiles.map(t => ({tile:t, num:t.num, color:t.color}));
     for (const item of order) row.appendChild(tileButton(item.tile, info.valid ? item : null, true));
     card.appendChild(row);
@@ -1041,9 +1042,24 @@ document.getElementById("askVeil").addEventListener("click", e => {
 let lastLoc = {}, nowLoc = {}, enterN = 0;
 const _renderInner = render;
 render = function(){
+  // 重畫等於整個重建 DOM，捲軸會歸零。先記下來，畫完再放回去，
+  // 不然在長順子上往右滑、點一張牌，畫面就彈回最左邊。
+  const keep = {};
+  document.querySelectorAll(".set-tiles[data-set]").forEach(el => {
+    if (el.scrollLeft) keep[el.dataset.set] = el.scrollLeft;
+  });
+  const boardEl = document.getElementById("board");
+  const boardTop = boardEl ? boardEl.scrollTop : 0;
+
   nowLoc = {}; enterN = 0;
   _renderInner();
   lastLoc = nowLoc;
+
+  document.querySelectorAll(".set-tiles[data-set]").forEach(el => {
+    const v = keep[el.dataset.set];
+    if (v) el.scrollLeft = v;
+  });
+  if (boardEl && boardTop) boardEl.scrollTop = boardTop;
 };
 function shakeBad(){
   document.querySelectorAll(".set.bad").forEach(el => {
